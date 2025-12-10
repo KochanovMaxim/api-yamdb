@@ -23,15 +23,3 @@ class IsModerator(BasePermission):
             request.user.is_authenticated
             and request.user.role == 'moderator'
         )
-
-
-class IsAdminOrModerator(BasePermission):
-    """Доступ администраторам и модераторам."""
-    def has_permission(self, request, view):
-        return (
-            request.user.is_authenticated
-            and (
-                request.user.role in ('admin', 'moderator')
-                or request.user.is_superuser
-            )
-        )
