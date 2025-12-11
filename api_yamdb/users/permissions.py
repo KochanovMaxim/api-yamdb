@@ -5,14 +5,13 @@ User = get_user_model()
 
 
 class IsAdmin(BasePermission):
-    """Доступ только администраторам."""
+    """Доступ только администраторам (включая superuser)."""
     def has_permission(self, request, view):
-        return (
-            request.user.is_authenticated
-            and (
-                request.user.role == User.ADMIN
-                or request.user.is_superuser
-            )
+        user = getattr(request, 'user', None)
+        if not user or not user.is_authenticated:
+            return False
+        return bool(
+            user.is_superuser or getattr(user, 'role', None) == User.ADMIN
         )
 
 

@@ -120,12 +120,19 @@ class UserMeView(APIView):
 
 
 class UserViewSet(viewsets.ModelViewSet):
-    """CRUD-операции с пользователями (только для администратора)."""
-    permission_classes = (IsAdmin,)
+    """
+    CRUD-операции с пользователями — только для администратора.
+    Список доступен admin/superuser; незалогиненный получает 401.
+    """
     queryset = User.objects.all()
+    serializer_class = AdminUserSerializer
+    permission_classes = (permissions.IsAuthenticated, IsAdmin)
     lookup_field = 'username'
     filter_backends = (filters.SearchFilter,)
     search_fields = ('username',)
+    http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
 
     def get_serializer_class(self):
+        if self.action in ('list', 'retrieve'):
+            return AdminUserSerializer
         return AdminUserSerializer
