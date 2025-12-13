@@ -1,16 +1,33 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from reviews.models import Comment, Review
-from reviews.constants import MAX_SCORE, MIN_SCORE
+from reviews.models import Category, Comment, Genre, Review, Title
 
 User = get_user_model()
 
 
-# class TitleReadSerializer(serializers.ModelSerializer):
-#     ...
-#     rating = serializers.IntegerField()
-#     ...
+class CategorySerializer(serializers.ModelSerializer):
+
+    class Meta:
+        exclude = ['id']
+        model = Category
+
+
+class GenreSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        exclude = ['id']
+        model = Genre
+
+
+class TitleSerializer(serializers.ModelSerializer):
+    category = CategorySerializer(read_only=True)
+    genre = GenreSerializer(many=True, read_only=True)
+    rating = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        fields = '__all__'
+        model = Title
 
 
 class ReviewSerializer(serializers.ModelSerializer):
@@ -20,14 +37,7 @@ class ReviewSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Review
-        fields = ('id', 'text', 'author', 'score', 'pub_date')
-
-    def validate_score(self, score):
-        if score < MIN_SCORE or score > MAX_SCORE:
-            raise serializers.ValidationError(
-                f'Оценка должна быть от {MIN_SCORE} до {MAX_SCORE}'
-            )
-        return score
+        fields = '__all__'
 
     def validate(self, attrs):
         author = self.context['request'].user

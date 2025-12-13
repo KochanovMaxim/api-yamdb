@@ -1,24 +1,62 @@
+from django.db.models import Avg
 from django.shortcuts import get_object_or_404
-from rest_framework import mixins, viewsets
+from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.pagination import PageNumberPagination
 
-from api.serializers import (CommentSerializer, ReviewSerializer)
-from reviews.models import Review, Title
+from .permissions import (
+    IsAdminModeratorAuthorOrReadOnly,
+    IsAdminUserOrReadOnly
+)
+from api.serializers import (
+    CategorySerializer,
+    CommentSerializer,
+    GenreSerializer,
+    ReviewSerializer,
+    TitleSerializer
+)
+from reviews.models import Category, Genre, Review, Title
+from api.mixins import ListCreateDestroyViewSet
 
 
-# from django.db.models import Avg
-# class TitleViewSet(viewsets.ModelViewSet):
-#     ...
-#     queryset = Title.objects.annotate(rating=Avg('reviews__score'))
-#     ...
+class CategoryViewSet(ListCreateDestroyViewSet):
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+    permission_classes = (IsAdminUserOrReadOnly,)
 
 
-class ReviewViewSet(viewsets.ReadOnlyModelViewSet):
-    serializer_class = ReviewSerializer
-    permission_classes = (IsAuthenticatedOrReadOnly, )
+class GenreViewSet(ListCreateDestroyViewSet):
+    queryset = Genre.objects.all()
+    serializer_class = GenreSerializer
+    permission_classes = (IsAdminUserOrReadOnly,)
+
+
+class TitleViewSet(viewsets.ModelViewSet):
+    queryset = Title.objects.annotate(
+        rating=Avg('reviews__score')).order_by('rating')
+    serializer_class = TitleSerializer
+    permission_classes = (IsAdminUserOrReadOnly,)
     pagination_class = PageNumberPagination
-    # Добавить пермишены, когда их сделают
+
+    def perform_create(self, serializer):
+        category = get_object_or_404(
+            Category, slug=self.request.data.get('category')
+        )
+        genre = Genre.objects.filter(
+            slug__in=self.request.data.getlist('genre')
+        )
+        serializer.save(category=category, genre=genre)
+
+    def perform_update(self, serializer):
+        self.perform_create(serializer)
+
+
+class ReviewViewSet(viewsets.ModelViewSet):
+    serializer_class = ReviewSerializer
+    permission_classes = (
+        IsAuthenticatedOrReadOnly, IsAdminModeratorAuthorOrReadOnly
+    )
+    pagination_class = PageNumberPagination
 
     def get_review_title(self):
         title_id = self.kwargs.get('title_id')
@@ -37,9 +75,10 @@ class ReviewViewSet(viewsets.ReadOnlyModelViewSet):
 
 class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
-    permission_classes = permission_classes = (IsAuthenticatedOrReadOnly, )
+    permission_classes = (
+        IsAuthenticatedOrReadOnly, IsAdminModeratorAuthorOrReadOnly
+    )
     pagination_class = PageNumberPagination
-    # Добавить пермишены, когда их сделают
 
     def get_comment_review(self):
         title_id = self.kwargs.get('title_id')
