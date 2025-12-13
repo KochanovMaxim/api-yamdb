@@ -4,10 +4,7 @@ from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.pagination import PageNumberPagination
 
-from .permissions import (
-    IsAdminModeratorAuthorOrReadOnly,
-    IsAdminUserOrReadOnly
-)
+from .pemissions import IsAdmin, IsModerator
 from api.serializers import (
     CategorySerializer,
     CommentSerializer,
@@ -22,20 +19,20 @@ from api.mixins import ListCreateDestroyViewSet
 class CategoryViewSet(ListCreateDestroyViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
-    permission_classes = (IsAdminUserOrReadOnly,)
+    permission_classes = (IsAdmin,)
 
 
 class GenreViewSet(ListCreateDestroyViewSet):
     queryset = Genre.objects.all()
     serializer_class = GenreSerializer
-    permission_classes = (IsAdminUserOrReadOnly,)
+    permission_classes = (IsAdmin,)
 
 
 class TitleViewSet(viewsets.ModelViewSet):
     queryset = Title.objects.annotate(
         rating=Avg('reviews__score')).order_by('rating')
     serializer_class = TitleSerializer
-    permission_classes = (IsAdminUserOrReadOnly,)
+    permission_classes = (IsAdmin,)
     pagination_class = PageNumberPagination
 
     def perform_create(self, serializer):
@@ -54,7 +51,7 @@ class TitleViewSet(viewsets.ModelViewSet):
 class ReviewViewSet(viewsets.ModelViewSet):
     serializer_class = ReviewSerializer
     permission_classes = (
-        IsAuthenticatedOrReadOnly, IsAdminModeratorAuthorOrReadOnly
+        IsAuthenticatedOrReadOnly, IsModerator
     )
     pagination_class = PageNumberPagination
 
@@ -76,7 +73,7 @@ class ReviewViewSet(viewsets.ModelViewSet):
 class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
     permission_classes = (
-        IsAuthenticatedOrReadOnly, IsAdminModeratorAuthorOrReadOnly
+        IsAuthenticatedOrReadOnly, IsModerator
     )
     pagination_class = PageNumberPagination
 
