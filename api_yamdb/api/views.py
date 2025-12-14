@@ -4,7 +4,7 @@ from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.pagination import PageNumberPagination
 
-from .pemissions import IsAdmin, IsModerator
+from users.permissions import IsModerator, IsAdmin
 from api.serializers import (
     CategorySerializer,
     CommentSerializer,

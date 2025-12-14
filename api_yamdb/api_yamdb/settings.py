@@ -4,17 +4,14 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'p&l%385148kslhtyn^##a1)ilz@4zqj=rq&agdol^##zgl9(vs'
 
-# SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
 AUTH_USER_MODEL = 'users.User'
 
-# Application definition
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -61,7 +58,6 @@ TEMPLATES = [
 WSGI_APPLICATION = 'api_yamdb.wsgi.application'
 
 
-# Database
 
 DATABASES = {
     'default': {
@@ -71,7 +67,6 @@ DATABASES = {
 }
 
 
-# Password validation
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -106,7 +101,6 @@ SIMPLE_JWT = {
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 DEFAULT_FROM_EMAIL = 'no-reply@example.com'
 
-# Internationalization
 
 LANGUAGE_CODE = 'ru-RU'
 
@@ -119,7 +113,6 @@ USE_L10N = True
 USE_TZ = True
 
 
-# Static files (CSS, JavaScript, Images)
 
 STATIC_URL = '/static/'
 
