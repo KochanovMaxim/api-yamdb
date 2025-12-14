@@ -1,5 +1,5 @@
 from django.contrib.auth import get_user_model
-from rest_framework.permissions import BasePermission
+from rest_framework.permissions import BasePermission, SAFE_METHODS
 
 User = get_user_model()
 
@@ -22,3 +22,11 @@ class IsModerator(BasePermission):
             request.user.is_authenticated
             and request.user.role == 'moderator'
         )
+
+
+class IsAdminOrReadOnly(IsAdmin):
+    """Разрешает чтение всем, запись только админам."""
+    def has_permission(self, request, view):
+        if request.method in SAFE_METHODS:
+            return True
+        return super().has_permission(request, view)
