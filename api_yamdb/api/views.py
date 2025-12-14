@@ -60,6 +60,7 @@ class ReviewViewSet(viewsets.ModelViewSet):
     serializer_class = ReviewSerializer
     permission_classes = (IsAuthorModeratorAdminOrReadOnly,)
     pagination_class = PageNumberPagination
+    http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
 
     def get_review_title(self):
         title_id = self.kwargs.get('title_id')
@@ -80,6 +81,7 @@ class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
     permission_classes = (IsAuthorModeratorAdminOrReadOnly,)
     pagination_class = PageNumberPagination
+    http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
 
     def get_comment_review(self):
         title_id = self.kwargs.get('title_id')
