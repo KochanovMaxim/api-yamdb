@@ -7,14 +7,12 @@ User = get_user_model()
 
 
 class CategorySerializer(serializers.ModelSerializer):
-
     class Meta:
         exclude = ['id']
         model = Category
 
 
 class GenreSerializer(serializers.ModelSerializer):
-
     class Meta:
         exclude = ['id']
         model = Genre
@@ -32,20 +30,28 @@ class TitleSerializer(serializers.ModelSerializer):
 
 class ReviewSerializer(serializers.ModelSerializer):
     author = serializers.SlugRelatedField(
-        slug_field='username', read_only=True
+        slug_field='username',
+        read_only=True
     )
 
     class Meta:
         model = Review
-        fields = '__all__'
+        fields = ('id', 'text', 'author', 'score', 'pub_date', 'title')
+        read_only_fields = ('author', 'title', 'pub_date')
 
     def validate(self, attrs):
+        if self.context['request'].method != 'POST':
+            return attrs
+
         author = self.context['request'].user
-        title = self.context['view'].kwargs.get('title_id')
-        if (
-            self.context['request'].method == 'POST'
-            and Review.objects.filter(author=author, title=title).exists()
-        ):
+        title_id = self.context['view'].kwargs.get('title_id')
+
+        try:
+            title = Title.objects.get(id=title_id)
+        except Title.DoesNotExist:
+            raise serializers.ValidationError('Произведение не найдено.')
+
+        if Review.objects.filter(author=author, title=title).exists():
             raise serializers.ValidationError(
                 'Нельзя написать два отзыва на произведение'
             )
@@ -54,8 +60,11 @@ class ReviewSerializer(serializers.ModelSerializer):
 
 class CommentSerializer(serializers.ModelSerializer):
     author = serializers.SlugRelatedField(
-        slug_field='username', read_only=True)
+        slug_field='username',
+        read_only=True
+    )
 
     class Meta:
         model = Comment
-        fields = ('id', 'text', 'author', 'pub_date')
+        fields = ('id', 'text', 'author', 'pub_date', 'review')
+        read_only_fields = ('author', 'review', 'pub_date')
