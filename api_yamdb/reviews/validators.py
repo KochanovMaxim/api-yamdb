@@ -1,7 +1,7 @@
 from django.core.exceptions import ValidationError
-from django.core.validators import RegexValidator
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+import re
 
 from reviews.constants import (
     MIN_SCORE,
@@ -12,11 +12,16 @@ from reviews.constants import (
 )
 
 
-def characters_validator():
-    return RegexValidator(
-        r'^[-a-zA-Z0-9_]+$',
-        _('Символы латинского алфавита, цифры и знак подчёркивания')
-    )
+def characters_validator(value):
+    if not value:
+        return
+
+    pattern = r'^[-a-zA-Z0-9_]+$'
+
+    if not re.match(pattern, value):
+        raise ValidationError(
+            _('Разрешены только символы латинского алфавита, цифры и дефисы')
+        )
 
 
 def validate_film_year(value):
