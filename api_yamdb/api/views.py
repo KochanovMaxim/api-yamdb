@@ -1,10 +1,14 @@
 from django.db.models import Avg
 from django.shortcuts import get_object_or_404
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
-from rest_framework.pagination import PageNumberPagination
+from rest_framework.pagination import (
+    PageNumberPagination, LimitOffsetPagination
+)
 
 from users.permissions import IsModerator, IsAdminOrReadOnly
+from .filters import TitleFilter
 from api.serializers import (
     CategorySerializer,
     CommentSerializer,
@@ -33,7 +37,9 @@ class TitleViewSet(viewsets.ModelViewSet):
         rating=Avg('reviews__score')).order_by('rating')
     serializer_class = TitleSerializer
     permission_classes = (IsAdminOrReadOnly,)
-    pagination_class = PageNumberPagination
+    pagination_class = LimitOffsetPagination
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = TitleFilter
 
     def perform_create(self, serializer):
         category = get_object_or_404(
