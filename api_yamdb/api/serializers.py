@@ -48,13 +48,13 @@ class ReviewSerializer(serializers.ModelSerializer):
 
         try:
             title = Title.objects.get(id=title_id)
+            if Review.objects.filter(author=author, title=title).exists():
+                raise serializers.ValidationError(
+                    'Нельзя написать два отзыва на произведение'
+                )
         except Title.DoesNotExist:
-            raise serializers.ValidationError('Произведение не найдено.')
+            pass
 
-        if Review.objects.filter(author=author, title=title).exists():
-            raise serializers.ValidationError(
-                'Нельзя написать два отзыва на произведение'
-            )
         return attrs
 
 
