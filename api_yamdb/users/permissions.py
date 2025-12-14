@@ -30,3 +30,34 @@ class IsAdminOrReadOnly(IsAdmin):
         if request.method in SAFE_METHODS:
             return True
         return super().has_permission(request, view)
+
+
+# ДОБАВЬТЕ ЭТОТ НОВЫЙ PERMISSION:
+class IsAuthorModeratorAdminOrReadOnly(BasePermission):
+    """
+    Разрешает чтение всем.
+    Разрешает запись только автору, модератору или админу.
+    """
+    def has_permission(self, request, view):
+        if request.method in SAFE_METHODS:
+            return True
+
+        return request.user and request.user.is_authenticated
+
+    def has_object_permission(self, request, view, obj):
+        if request.method in SAFE_METHODS:
+            return True
+
+        user = request.user
+
+        if hasattr(obj, 'author') and obj.author == user:
+            return True
+
+        if hasattr(user, 'role'):
+            if user.role in ['moderator', 'admin']:
+                return True
+
+        if user.is_superuser:
+            return True
+
+        return False
