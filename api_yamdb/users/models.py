@@ -1,5 +1,6 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+
 from reviews.constants import (
     USERNAME_MAX_LENGTH,
     EMAIL_MAX_LENGTH,
@@ -18,7 +19,7 @@ class User(AbstractUser):
     username = models.CharField(
         max_length=USERNAME_MAX_LENGTH,
         unique=True,
-        help_text='Обязательное поле. 150 символов или меньше.',
+        help_text=f'Обязательное поле. {USERNAME_MAX_LENGTH} символов.',
         validators=[validate_username_not_me],
         error_messages={
             'unique': 'Пользователь с таким именем уже существует.',
@@ -54,13 +55,13 @@ class User(AbstractUser):
     @property
     def is_admin(self):
         return (
-            self.is_authenticated and
-            (self.is_superuser or self.is_staff or self.role == ADMIN)
+            self.is_authenticated
+            and (self.is_superuser or self.is_staff or self.role == ADMIN)
         )
 
     @property
     def is_moderator(self):
         return (
-            self.is_authenticated and
-            self.role == MODERATOR
+            self.is_authenticated
+            and self.role == MODERATOR
         )
