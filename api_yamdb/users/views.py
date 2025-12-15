@@ -49,9 +49,29 @@ class TokenView(APIView):
 
     def post(self, request):
         serializer = TokenSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
 
-        user = serializer.validated_data['user']
+        if not serializer.is_valid():
+            return Response(
+                serializer.errors, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        validated_data = serializer.validated_data
+
+        if 'user' not in validated_data:
+            # Пользователь не найден - возвращаем 404
+            return Response(
+                {'username': 'Пользователь не найден'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        user = validated_data['user']
+
+        confirmation_code = validated_data.get('confirmation_code')
+        if not default_token_generator.check_token(user, confirmation_code):
+            return Response(
+                {'confirmation_code': 'Неверный код подтверждения'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         token = AccessToken.for_user(user)
 
@@ -87,6 +107,12 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
 
         elif request.method == 'PATCH':
+            if 'role' in request.data:
+                return Response(
+                    {'role': 'Вы не можете изменить свою роль.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
             serializer = self.get_serializer(
                 user,
                 data=request.data,

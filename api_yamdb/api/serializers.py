@@ -178,7 +178,7 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = (
-            'username', 'email', 'first_name', 'last_name', 'bio', 'role',
+            'username', 'email', 'first_name', 'last_name', 'bio', 'role'
         )
         read_only_fields = ('role',)
 
@@ -212,10 +212,32 @@ class AdminUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = (
-            'username', 'email', 'first_name', 'last_name', 'bio', 'role',
+            'username', 'email', 'first_name', 'last_name', 'bio', 'role'
         )
+        extra_kwargs = {
+            'username': {
+                'validators': []
+            }
+        }
 
     def validate_username(self, value):
         if value == FORBIDDEN_USERNAME:
             raise serializers.ValidationError('Недопустимое имя пользователя')
+
+        if self.instance is None:
+            if User.objects.filter(username=value).exists():
+                raise serializers.ValidationError(
+                    'Пользователь с таким именем уже существует.'
+                )
+
+        return value
+
+    def validate_email(self, value):
+
+        if self.instance is None:
+            if User.objects.filter(email=value).exists():
+                raise serializers.ValidationError(
+                    'Пользователь с таким email уже существует.'
+                )
+
         return value
