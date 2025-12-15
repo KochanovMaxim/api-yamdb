@@ -1,280 +1,69 @@
-import os
-import django
-import csv
+from django.contrib.auth.models import AbstractUser
+from django.db import models
 
-from django.contrib.auth import get_user_model
-from reviews.models import Category, Genre, Title, Review, Comment
-
-
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'api_yamdb.settings')
-django.setup()
-
-
-User = get_user_model()
-
-
-def clean_value(value):
-    if value == 'NULL' or value is None or value == '':
-        return ''
-    return str(value).strip()
+from reviews.constants import (
+    USERNAME_MAX_LENGTH,
+    EMAIL_MAX_LENGTH,
+    ROLE_MAX_LENGTH,
+    ROLE_CHOICES,
+    USER,
+    MODERATOR,
+    ADMIN,
+)
+from users.validators import validate_username_not_me
 
 
-print("="*50)
-print("НАЧАЛО ЗАГРУЗКИ ДАННЫХ ИЗ CSV ФАЙЛОВ")
-print("="*50)
+class User(AbstractUser):
+    ROLE_CHOICES = ROLE_CHOICES
 
-print("\n1. ЗАГРУЗКА ПОЛЬЗОВАТЕЛЕЙ...")
-users_path = os.path.join('static', 'data', 'users.csv')
-try:
-    with open(users_path, 'r', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        user_count = 0
-        for row in reader:
-            try:
-                user, created = User.objects.get_or_create(
-                    id=int(clean_value(row['id'])),
-                    defaults={
-                        'username': clean_value(row['username']),
-                        'email': clean_value(row['email']),
-                        'role': clean_value(row['role']),
-                        'bio': clean_value(row['bio']),
-                        'first_name': clean_value(row['first_name']),
-                        'last_name': clean_value(row['last_name']),
-                    }
-                )
-                if created:
-                    user_count += 1
-            except Exception:
-                print("Ошибка при загрузке пользователя ID")
+    username = models.CharField(
+        max_length=USERNAME_MAX_LENGTH,
+        unique=True,
+        help_text=f'Обязательное поле. {USERNAME_MAX_LENGTH} символов или <.',
+        validators=[validate_username_not_me],
+        error_messages={
+            'unique': 'Пользователь с таким именем уже существует.',
+        },
+    )
 
-    print(f"  ✓ Загружено пользователей: {user_count}")
-except FileNotFoundError:
-    print(f"  ✗ Файл не найден: {users_path}")
-except Exception as e:
-    print(f"  ✗ Ошибка при чтении файла пользователей: {e}")
+    email = models.EmailField(
+        unique=True,
+        max_length=EMAIL_MAX_LENGTH,
+        verbose_name='email address'
+    )
 
-print("\n2. ЗАГРУЗКА КАТЕГОРИЙ...")
-categories_path = os.path.join('static', 'data', 'category.csv')
-try:
-    with open(categories_path, 'r', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        category_count = 0
-        for row in reader:
-            try:
-                category, created = Category.objects.get_or_create(
-                    id=int(clean_value(row['id'])),
-                    defaults={
-                        'name': clean_value(row['name']),
-                        'slug': clean_value(row['slug']),
-                    }
-                )
-                if created:
-                    category_count += 1
-            except Exception:
-                print("Ошибка при загрузке категории ID")
+    role = models.CharField(
+        max_length=ROLE_MAX_LENGTH,
+        choices=ROLE_CHOICES,
+        default=USER,
+        verbose_name='роль'
+    )
 
-    print(f"  ✓ Загружено категорий: {category_count}")
-except FileNotFoundError:
-    print(f"  ✗ Файл не найден: {categories_path}")
-except Exception as e:
-    print(f"  ✗ Ошибка при чтении файла категорий: {e}")
+    bio = models.TextField(
+        blank=True,
+        verbose_name='био'
+    )
 
-print("\n3. ЗАГРУЗКА ЖАНРОВ...")
-genres_path = os.path.join('static', 'data', 'genre.csv')
-try:
-    with open(genres_path, 'r', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        genre_count = 0
-        for row in reader:
-            try:
-                genre, created = Genre.objects.get_or_create(
-                    id=int(clean_value(row['id'])),
-                    defaults={
-                        'name': clean_value(row['name']),
-                        'slug': clean_value(row['slug']),
-                    }
-                )
-                if created:
-                    genre_count += 1
-            except Exception:
-                print("Ошибка при загрузке жанра ID")
+    class Meta:
+        ordering = ('username',)
+        verbose_name = 'Пользователь'
+        verbose_name_plural = 'Пользователи'
 
-    print(f"  ✓ Загружено жанров: {genre_count}")
-except FileNotFoundError:
-    print(f"  ✗ Файл не найден: {genres_path}")
-except Exception as e:
-    print(f"  ✗ Ошибка при чтении файла жанров: {e}")
+    def __str__(self):
+        return self.username
 
-print("\n4. ЗАГРУЗКА ПРОИЗВЕДЕНИЙ...")
-titles_path = os.path.join('static', 'data', 'titles.csv')
-try:
-    with open(titles_path, 'r', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        title_count = 0
-        for row in reader:
-            try:
-                category_id = clean_value(row['category'])
-                category = None
-                if category_id:
-                    try:
-                        category = Category.objects.get(id=int(category_id))
-                    except Category.DoesNotExist:
-                        continue
+    @property
+    def is_admin(self):
+        """Проверяет, является ли пользователь администратором."""
+        return (
+            self.is_authenticated
+            and (self.is_superuser or self.is_staff or self.role == ADMIN)
+        )
 
-                if 'description' in row:
-                    description = clean_value(row['description'])
-                else:
-                    ''
-                if clean_value(row['year']):
-                    year = int(clean_value(row['year']))
-                else:
-                    None
-
-                title, created = Title.objects.get_or_create(
-                    id=int(clean_value(row['id'])),
-                    defaults={
-                        'name': clean_value(row['name']),
-                        'year': year,
-                        'category': category,
-                        'description': description,
-                    }
-                )
-                if created:
-                    title_count += 1
-            except Exception:
-                print("  Ошибка при загрузке произведения ID")
-
-    print(f"  ✓ Загружено произведений: {title_count}")
-except FileNotFoundError:
-    print(f"  ✗ Файл не найден: {titles_path}")
-except Exception as e:
-    print(f"  ✗ Ошибка при чтении файла произведений: {e}")
-
-print("\n5. ЗАГРУЗКА СВЯЗЕЙ ЖАНРОВ И ПРОИЗВЕДЕНИЙ...")
-genre_title_path = os.path.join('static', 'data', 'genre_title.csv')
-try:
-    with open(genre_title_path, 'r', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        relation_count = 0
-        for row in reader:
-            try:
-                title_id = int(clean_value(row['title_id']))
-                genre_id = int(clean_value(row['genre_id']))
-
-                title = Title.objects.get(id=title_id)
-                genre = Genre.objects.get(id=genre_id)
-
-                if not title.genre.filter(id=genre_id).exists():
-                    title.genre.add(genre)
-                    relation_count += 1
-            except Title.DoesNotExist:
-                print(f"  ⚠ Произведение с id {title_id} не найдено")
-            except Genre.DoesNotExist:
-                print(f"  ⚠ Жанр с id {genre_id} не найден")
-            except Exception as e:
-                print(f"  Ошибка при загрузке связи: {e}")
-
-    print(f"  ✓ Загружено связей: {relation_count}")
-except FileNotFoundError:
-    print(f"  ✗ Файл не найден: {genre_title_path}")
-except Exception as e:
-    print(f"  ✗ Ошибка при чтении файла связей: {e}")
-
-print("\n6. ЗАГРУЗКА ОТЗЫВОВ...")
-reviews_path = os.path.join('static', 'data', 'review.csv')
-try:
-    with open(reviews_path, 'r', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        review_count = 0
-        for row in reader:
-            try:
-                title_id = int(clean_value(row['title_id']))
-                author_id = int(clean_value(row['author']))
-
-                title = Title.objects.get(id=title_id)
-                author = User.objects.get(id=author_id)
-
-                if clean_value(row['score']):
-                    score = int(clean_value(row['score']))
-                else:
-                    1
-                score = max(1, min(10, score))
-
-                review, created = Review.objects.get_or_create(
-                    id=int(clean_value(row['id'])),
-                    defaults={
-                        'title': title,
-                        'text': clean_value(row['text']),
-                        'author': author,
-                        'score': score,
-                        'pub_date': clean_value(row['pub_date']),
-                    }
-                )
-                if created:
-                    review_count += 1
-            except Title.DoesNotExist:
-                print(f"  ⚠ Произведение с id {title_id} не найдено")
-            except User.DoesNotExist:
-                print(f"  ⚠ Пользователь с id {author_id} не найден")
-            except Exception:
-                print("  Ошибка при загрузке отзыва ID")
-
-    print(f"  ✓ Загружено отзывов: {review_count}")
-except FileNotFoundError:
-    print(f"  ✗ Файл не найден: {reviews_path}")
-except Exception as e:
-    print(f"  ✗ Ошибка при чтении файла отзывов: {e}")
-
-print("\n7. ЗАГРУЗКА КОММЕНТАРИЕВ...")
-comments_path = os.path.join('static', 'data', 'comments.csv')
-try:
-    with open(comments_path, 'r', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        comment_count = 0
-        for row in reader:
-            try:
-                review_id = int(clean_value(row['review_id']))
-                author_id = int(clean_value(row['author']))
-
-                review = Review.objects.get(id=review_id)
-                author = User.objects.get(id=author_id)
-
-                comment, created = Comment.objects.get_or_create(
-                    id=int(clean_value(row['id'])),
-                    defaults={
-                        'review': review,
-                        'text': clean_value(row['text']),
-                        'author': author,
-                        'pub_date': clean_value(row['pub_date']),
-                    }
-                )
-                if created:
-                    comment_count += 1
-            except Review.DoesNotExist:
-                print(f"  ⚠ Отзыв с id {review_id} не найден")
-            except User.DoesNotExist:
-                print(f"  ⚠ Пользователь с id {author_id} не найден")
-            except Exception:
-                print("  Ошибка при загрузке комментария ID")
-
-    print(f"  ✓ Загружено комментариев: {comment_count}")
-except FileNotFoundError:
-    print(f"  ✗ Файл не найден: {comments_path}")
-except Exception as e:
-    print(f"  ✗ Ошибка при чтении файла комментариев: {e}")
-
-print("\n" + "="*50)
-print("ЗАГРУЗКА ДАННЫХ ЗАВЕРШЕНА!")
-print("="*50)
-print("ИТОГОВАЯ СТАТИСТИКА:")
-print(f"  📊 Пользователи: {User.objects.count()}")
-print(f"  📊 Категории: {Category.objects.count()}")
-print(f"  📊 Жанры: {Genre.objects.count()}")
-print(f"  📊 Произведения: {Title.objects.count()}")
-print(f"  📊 Отзывы: {Review.objects.count()}")
-print(f"  📊 Комментарии: {Comment.objects.count()}")
-
-print("\nПРОВЕРКА СВЯЗЕЙ:")
-for title in Title.objects.all()[:3]:
-    genres = ", ".join([g.name for g in title.genre.all()])
-    print(f"  '{title.name}': {genres or 'нет жанров'}")
+    @property
+    def is_moderator(self):
+        """Проверяет, является ли пользователь модератором."""
+        return (
+            self.is_authenticated
+            and self.role == MODERATOR
+        )
