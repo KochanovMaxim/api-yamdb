@@ -163,9 +163,7 @@ class TokenSerializer(serializers.Serializer):
         try:
             user = User.objects.get(username=username)
         except User.DoesNotExist:
-            raise serializers.ValidationError(
-                {'username': 'Пользователь не найден'}
-            )
+            return data
 
         if not default_token_generator.check_token(user, confirmation_code):
             raise serializers.ValidationError(
@@ -180,24 +178,44 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = (
-            'username',
-            'email',
-            'first_name',
-            'last_name',
-            'bio',
-            'role',
+            'username', 'email', 'first_name', 'last_name', 'bio', 'role',
         )
         read_only_fields = ('role',)
 
+    def validate_username(self, value):
+        if value == FORBIDDEN_USERNAME:
+            raise serializers.ValidationError('Недопустимое имя пользователя')
+        return value
+
+    def validate(self, data):
+        if self.instance is not None:
+            if 'role' in data and data['role'] != self.instance.role:
+                raise serializers.ValidationError({
+                    'role': 'Вы не можете изменить свою роль.'
+                })
+
+        return data
+
 
 class AdminUserSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(
+        max_length=USERNAME_MAX_LENGTH,
+        required=True,
+        validators=[
+            RegexValidator(
+                regex=USERNAME_REGEX,
+                message='Недопустимые символы в имени пользователя'
+            )
+        ]
+    )
+
     class Meta:
         model = User
         fields = (
-            'username',
-            'email',
-            'first_name',
-            'last_name',
-            'bio',
-            'role',
+            'username', 'email', 'first_name', 'last_name', 'bio', 'role',
         )
+
+    def validate_username(self, value):
+        if value == FORBIDDEN_USERNAME:
+            raise serializers.ValidationError('Недопустимое имя пользователя')
+        return value
