@@ -14,9 +14,30 @@ User = get_user_model()
 
 
 def clean_value(value):
+    """Очищает значение от NULL и лишних пробелов."""
     if value == 'NULL' or value is None or value == '':
         return ''
     return str(value).strip()
+
+
+def process_user_row(row):
+    """Обрабатывает одну строку с данными пользователя."""
+    try:
+        user, created = User.objects.get_or_create(
+            id=int(clean_value(row['id'])),
+            defaults={
+                'username': clean_value(row['username']),
+                'email': clean_value(row['email']),
+                'role': clean_value(row['role']),
+                'bio': clean_value(row['bio']),
+                'first_name': clean_value(row['first_name']),
+                'last_name': clean_value(row['last_name']),
+            }
+        )
+        return created
+    except Exception:
+        print("Ошибка при загрузке пользователя ID")
+        return False
 
 
 def load_users():
@@ -26,28 +47,27 @@ def load_users():
     try:
         with open(users_path, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
-            user_count = 0
-            for row in reader:
-                try:
-                    user, created = User.objects.get_or_create(
-                        id=int(clean_value(row['id'])),
-                        defaults={
-                            'username': clean_value(row['username']),
-                            'email': clean_value(row['email']),
-                            'role': clean_value(row['role']),
-                            'bio': clean_value(row['bio']),
-                            'first_name': clean_value(row['first_name']),
-                            'last_name': clean_value(row['last_name']),
-                        }
-                    )
-                    if created:
-                        user_count += 1
-                except Exception:
-                    print("Ошибка при загрузке пользователя ID")
+            user_count = sum(1 for row in reader if process_user_row(row))
 
         print(f"  ✓ Загружено пользователей: {user_count}")
     except FileNotFoundError:
         print(f"  ✗ Файл не найден: {users_path}")
+
+
+def process_category_row(row):
+    """Обрабатывает одну строку с данными категории."""
+    try:
+        category, created = Category.objects.get_or_create(
+            id=int(clean_value(row['id'])),
+            defaults={
+                'name': clean_value(row['name']),
+                'slug': clean_value(row['slug']),
+            }
+        )
+        return created
+    except Exception:
+        print("Ошибка при загрузке категории ID")
+        return False
 
 
 def load_categories():
@@ -57,24 +77,29 @@ def load_categories():
     try:
         with open(categories_path, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
-            category_count = 0
-            for row in reader:
-                try:
-                    category, created = Category.objects.get_or_create(
-                        id=int(clean_value(row['id'])),
-                        defaults={
-                            'name': clean_value(row['name']),
-                            'slug': clean_value(row['slug']),
-                        }
-                    )
-                    if created:
-                        category_count += 1
-                except Exception:
-                    print("Ошибка при загрузке категории ID")
+            category_count = sum(
+                1 for row in reader if process_category_row(row)
+            )
 
         print(f"  ✓ Загружено категорий: {category_count}")
     except FileNotFoundError:
         print(f"  ✗ Файл не найден: {categories_path}")
+
+
+def process_genre_row(row):
+    """Обрабатывает одну строку с данными жанра."""
+    try:
+        genre, created = Genre.objects.get_or_create(
+            id=int(clean_value(row['id'])),
+            defaults={
+                'name': clean_value(row['name']),
+                'slug': clean_value(row['slug']),
+            }
+        )
+        return created
+    except Exception:
+        print("Ошибка при загрузке жанра ID")
+        return False
 
 
 def load_genres():
@@ -84,24 +109,47 @@ def load_genres():
     try:
         with open(genres_path, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
-            genre_count = 0
-            for row in reader:
-                try:
-                    genre, created = Genre.objects.get_or_create(
-                        id=int(clean_value(row['id'])),
-                        defaults={
-                            'name': clean_value(row['name']),
-                            'slug': clean_value(row['slug']),
-                        }
-                    )
-                    if created:
-                        genre_count += 1
-                except Exception:
-                    print("Ошибка при загрузке жанра ID")
+            genre_count = sum(1 for row in reader if process_genre_row(row))
 
         print(f"  ✓ Загружено жанров: {genre_count}")
     except FileNotFoundError:
         print(f"  ✗ Файл не найден: {genres_path}")
+
+
+def process_title_row(row):
+    """Обрабатывает одну строку с данными произведения."""
+    try:
+        category_id = clean_value(row['category'])
+        category = None
+        if category_id:
+            try:
+                category = Category.objects.get(id=int(category_id))
+            except Category.DoesNotExist:
+                return False
+
+        if 'description' in row:
+            description = clean_value(row['description'])
+        else:
+            description = ''
+
+        if clean_value(row['year']):
+            year = int(clean_value(row['year']))
+        else:
+            year = None
+
+        title, created = Title.objects.get_or_create(
+            id=int(clean_value(row['id'])),
+            defaults={
+                'name': clean_value(row['name']),
+                'year': year,
+                'category': category,
+                'description': description,
+            }
+        )
+        return created
+    except Exception:
+        print("  Ошибка при загрузке произведения ID")
+        return False
 
 
 def load_titles():
@@ -111,45 +159,34 @@ def load_titles():
     try:
         with open(titles_path, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
-            title_count = 0
-            for row in reader:
-                try:
-                    category_id = clean_value(row['category'])
-                    category = None
-                    if category_id:
-                        try:
-                            category = Category.objects.get(
-                                id=int(category_id)
-                            )
-                        except Category.DoesNotExist:
-                            continue
-
-                    if 'description' in row:
-                        description = clean_value(row['description'])
-                    else:
-                        description = ''
-                    if clean_value(row['year']):
-                        year = int(clean_value(row['year']))
-                    else:
-                        year = None
-
-                    title, created = Title.objects.get_or_create(
-                        id=int(clean_value(row['id'])),
-                        defaults={
-                            'name': clean_value(row['name']),
-                            'year': year,
-                            'category': category,
-                            'description': description,
-                        }
-                    )
-                    if created:
-                        title_count += 1
-                except Exception:
-                    print("  Ошибка при загрузке произведения ID")
+            title_count = sum(1 for row in reader if process_title_row(row))
 
         print(f"  ✓ Загружено произведений: {title_count}")
     except FileNotFoundError:
         print(f"  ✗ Файл не найден: {titles_path}")
+
+
+def process_genre_title_row(row):
+    """Обрабатывает одну строку связи жанра и произведения."""
+    try:
+        title_id = int(clean_value(row['title_id']))
+        genre_id = int(clean_value(row['genre_id']))
+
+        title = Title.objects.get(id=title_id)
+        genre = Genre.objects.get(id=genre_id)
+
+        if not title.genre.filter(id=genre_id).exists():
+            title.genre.add(genre)
+            return True
+        return False
+    except Title.DoesNotExist:
+        print(f"  ⚠ Произведение с id {title_id} не найдено")
+    except Genre.DoesNotExist:
+        print(f"  ⚠ Жанр с id {genre_id} не найден")
+    except Exception as e:
+        print(f"  Ошибка при загрузке связи: {e}")
+
+    return False
 
 
 def load_genre_title():
@@ -159,28 +196,49 @@ def load_genre_title():
     try:
         with open(genre_title_path, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
-            relation_count = 0
-            for row in reader:
-                try:
-                    title_id = int(clean_value(row['title_id']))
-                    genre_id = int(clean_value(row['genre_id']))
-
-                    title = Title.objects.get(id=title_id)
-                    genre = Genre.objects.get(id=genre_id)
-
-                    if not title.genre.filter(id=genre_id).exists():
-                        title.genre.add(genre)
-                        relation_count += 1
-                except Title.DoesNotExist:
-                    print(f"  ⚠ Произведение с id {title_id} не найдено")
-                except Genre.DoesNotExist:
-                    print(f"  ⚠ Жанр с id {genre_id} не найден")
-                except Exception as e:
-                    print(f"  Ошибка при загрузке связи: {e}")
+            relation_count = sum(
+                1 for row in reader if process_genre_title_row(row)
+            )
 
         print(f"  ✓ Загружено связей: {relation_count}")
     except FileNotFoundError:
         print(f"  ✗ Файл не найден: {genre_title_path}")
+
+
+def process_review_row(row):
+    """Обрабатывает одну строку с данными отзыва."""
+    try:
+        title_id = int(clean_value(row['title_id']))
+        author_id = int(clean_value(row['author']))
+
+        title = Title.objects.get(id=title_id)
+        author = User.objects.get(id=author_id)
+
+        if clean_value(row['score']):
+            score = int(clean_value(row['score']))
+        else:
+            score = 1
+        score = max(1, min(10, score))
+
+        review, created = Review.objects.get_or_create(
+            id=int(clean_value(row['id'])),
+            defaults={
+                'title': title,
+                'text': clean_value(row['text']),
+                'author': author,
+                'score': score,
+                'pub_date': clean_value(row['pub_date']),
+            }
+        )
+        return created
+    except Title.DoesNotExist:
+        print(f"  ⚠ Произведение с id {title_id} не найдено")
+    except User.DoesNotExist:
+        print(f"  ⚠ Пользователь с id {author_id} не найден")
+    except Exception:
+        print("  Ошибка при загрузке отзыва ID")
+
+    return False
 
 
 def load_reviews():
@@ -190,43 +248,40 @@ def load_reviews():
     try:
         with open(reviews_path, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
-            review_count = 0
-            for row in reader:
-                try:
-                    title_id = int(clean_value(row['title_id']))
-                    author_id = int(clean_value(row['author']))
-
-                    title = Title.objects.get(id=title_id)
-                    author = User.objects.get(id=author_id)
-
-                    if clean_value(row['score']):
-                        score = int(clean_value(row['score']))
-                    else:
-                        score = 1
-                    score = max(1, min(10, score))
-
-                    review, created = Review.objects.get_or_create(
-                        id=int(clean_value(row['id'])),
-                        defaults={
-                            'title': title,
-                            'text': clean_value(row['text']),
-                            'author': author,
-                            'score': score,
-                            'pub_date': clean_value(row['pub_date']),
-                        }
-                    )
-                    if created:
-                        review_count += 1
-                except Title.DoesNotExist:
-                    print(f"  ⚠ Произведение с id {title_id} не найдено")
-                except User.DoesNotExist:
-                    print(f"  ⚠ Пользователь с id {author_id} не найден")
-                except Exception:
-                    print("  Ошибка при загрузке отзыва ID")
+            review_count = sum(1 for row in reader if process_review_row(row))
 
         print(f"  ✓ Загружено отзывов: {review_count}")
     except FileNotFoundError:
         print(f"  ✗ Файл не найден: {reviews_path}")
+
+
+def process_comment_row(row):
+    """Обрабатывает одну строку с данными комментария."""
+    try:
+        review_id = int(clean_value(row['review_id']))
+        author_id = int(clean_value(row['author']))
+
+        review = Review.objects.get(id=review_id)
+        author = User.objects.get(id=author_id)
+
+        comment, created = Comment.objects.get_or_create(
+            id=int(clean_value(row['id'])),
+            defaults={
+                'review': review,
+                'text': clean_value(row['text']),
+                'author': author,
+                'pub_date': clean_value(row['pub_date']),
+            }
+        )
+        return created
+    except Review.DoesNotExist:
+        print(f"  ⚠ Отзыв с id {review_id} не найден")
+    except User.DoesNotExist:
+        print(f"  ⚠ Пользователь с id {author_id} не найден")
+    except Exception:
+        print("  Ошибка при загрузке комментария ID")
+
+    return False
 
 
 def load_comments():
@@ -236,32 +291,9 @@ def load_comments():
     try:
         with open(comments_path, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
-            comment_count = 0
-            for row in reader:
-                try:
-                    review_id = int(clean_value(row['review_id']))
-                    author_id = int(clean_value(row['author']))
-
-                    review = Review.objects.get(id=review_id)
-                    author = User.objects.get(id=author_id)
-
-                    comment, created = Comment.objects.get_or_create(
-                        id=int(clean_value(row['id'])),
-                        defaults={
-                            'review': review,
-                            'text': clean_value(row['text']),
-                            'author': author,
-                            'pub_date': clean_value(row['pub_date']),
-                        }
-                    )
-                    if created:
-                        comment_count += 1
-                except Review.DoesNotExist:
-                    print(f"  ⚠ Отзыв с id {review_id} не найден")
-                except User.DoesNotExist:
-                    print(f"  ⚠ Пользователь с id {author_id} не найден")
-                except Exception:
-                    print("  Ошибка при загрузке комментария ID")
+            comment_count = sum(
+                1 for row in reader if process_comment_row(row)
+            )
 
         print(f"  ✓ Загружено комментариев: {comment_count}")
     except FileNotFoundError:
