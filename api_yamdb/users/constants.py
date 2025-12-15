@@ -1,0 +1,4 @@
+# Длины полей для модели User
+EMAIL_MAX_LENGTH = 254
+ROLE_MAX_LENGTH = 20
+USERNAME_MAX_LENGTH = 150

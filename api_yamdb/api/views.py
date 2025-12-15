@@ -1,24 +1,29 @@
 from django.db.models import Avg
 from django.shortcuts import get_object_or_404
+
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.pagination import (
-    PageNumberPagination, LimitOffsetPagination
+    LimitOffsetPagination,
+    PageNumberPagination
 )
 
-from users.permissions import (
-    IsAdminOrReadOnly, IsAuthorModeratorAdminOrReadOnly
-)
-from .filters import TitleFilter
+from api.mixins import ListCreateDestroyViewSet
 from api.serializers import (
     CategorySerializer,
     CommentSerializer,
     GenreSerializer,
     ReviewSerializer,
-    TitleSerializer
+    TitleReadSerializer,
+    TitleWriteSerializer
 )
 from reviews.models import Category, Genre, Review, Title
-from api.mixins import ListCreateDestroyViewSet
+from api.permissions import (
+    IsAdminOrReadOnly,
+    IsAuthorModeratorAdminOrReadOnly
+)
+from .filters import TitleFilter
 
 
 class CategoryViewSet(ListCreateDestroyViewSet):
@@ -36,29 +41,25 @@ class GenreViewSet(ListCreateDestroyViewSet):
 class TitleViewSet(viewsets.ModelViewSet):
     queryset = Title.objects.annotate(
         rating=Avg('reviews__score')).order_by('rating')
-    serializer_class = TitleSerializer
     permission_classes = (IsAdminOrReadOnly,)
     pagination_class = LimitOffsetPagination
     filter_backends = [DjangoFilterBackend]
     filterset_class = TitleFilter
     http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
+    ordering_fields = ['name', 'year', 'rating']
+    ordering = ['name']
 
-    def perform_create(self, serializer):
-        category = get_object_or_404(
-            Category, slug=self.request.data.get('category')
-        )
-        genre = Genre.objects.filter(
-            slug__in=self.request.data.getlist('genre')
-        )
-        serializer.save(category=category, genre=genre)
-
-    def perform_update(self, serializer):
-        self.perform_create(serializer)
+    def get_serializer_class(self):
+        if self.request.method in ['GET', 'HEAD', 'OPTIONS']:
+            return TitleReadSerializer
+        return TitleWriteSerializer
 
 
 class ReviewViewSet(viewsets.ModelViewSet):
     serializer_class = ReviewSerializer
-    permission_classes = (IsAuthorModeratorAdminOrReadOnly,)
+    permission_classes = (
+        IsAuthenticatedOrReadOnly, IsAuthorModeratorAdminOrReadOnly
+    )
     pagination_class = PageNumberPagination
     http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
 
@@ -79,7 +80,9 @@ class ReviewViewSet(viewsets.ModelViewSet):
 
 class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
-    permission_classes = (IsAuthorModeratorAdminOrReadOnly,)
+    permission_classes = (
+        IsAuthenticatedOrReadOnly, IsAuthorModeratorAdminOrReadOnly
+    )
     pagination_class = PageNumberPagination
     http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
 

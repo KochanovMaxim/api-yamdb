@@ -3,56 +3,31 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
 from rest_framework import filters, permissions, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import AccessToken
 
-from .permissions import IsAdmin
-from .serializers import (
+from api.permissions import IsAdmin
+from api.serializers import (
     AdminUserSerializer,
+    UserSerializer,
     SignupSerializer,
     TokenSerializer,
-    UserMeSerializer,
 )
+
 
 User = get_user_model()
 
 
 class SignupView(APIView):
-    """Регистрация пользователя и отправка кода подтверждения."""
     permission_classes = []
 
     def post(self, request):
-        """Создаёт пользователя или переотправляет код подтверждения."""
         serializer = SignupSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        username = serializer.validated_data['username']
-        email = serializer.validated_data['email']
-
-        if User.objects.filter(username=username).exists():
-            user = User.objects.get(username=username)
-            if user.email != email:
-                return Response(
-                    {
-                        'email': (
-                            'Этот email уже используется другим пользователем.'
-                        )
-                    },
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-        elif User.objects.filter(email=email).exists():
-            return Response(
-                {'email': 'Этот email уже используется другим пользователем.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        else:
-            user = User.objects.create_user(
-                username=username,
-                email=email
-            )
+        user = serializer.save()
 
         confirmation_code = default_token_generator.make_token(user)
 
@@ -60,70 +35,30 @@ class SignupView(APIView):
             subject='Код подтверждения',
             message=f'Ваш код подтверждения: {confirmation_code}',
             from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[email],
+            recipient_list=[user.email],
         )
 
         return Response(
-            {'username': username, 'email': email},
+            serializer.data,
             status=status.HTTP_200_OK
         )
 
 
 class TokenView(APIView):
-    """Получение JWT-токена по коду подтверждения."""
     permission_classes = []
 
     def post(self, request):
-        """Выдаёт JWT-токен при корректном коде подтверждения."""
         serializer = TokenSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        username = serializer.validated_data['username']
-        confirmation_code = serializer.validated_data['confirmation_code']
-
-        user = User.objects.filter(username=username).first()
-        if not user:
-            return Response(
-                {'username': 'Пользователь не найден'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        if not default_token_generator.check_token(user, confirmation_code):
-            return Response(
-                {'confirmation_code': 'Неверный код'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        user = serializer.validated_data['user']
 
         token = AccessToken.for_user(user)
 
         return Response({'token': str(token)})
 
 
-class UserMeView(APIView):
-    """Просмотр и редактирование текущего пользователя."""
-    permission_classes = (permissions.IsAuthenticated,)
-
-    def get(self, request):
-        """Возвращает данные текущего пользователя."""
-        serializer = UserMeSerializer(request.user)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    def patch(self, request):
-        """Частично обновляет профиль текущего пользователя."""
-        serializer = UserMeSerializer(
-            request.user,
-            data=request.data,
-            partial=True
-        )
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-
 class UserViewSet(viewsets.ModelViewSet):
-    """
-    CRUD-операции с пользователями — только для администратора.
-    Список доступен admin/superuser; незалогиненный получает 401.
-    """
     queryset = User.objects.all()
     serializer_class = AdminUserSerializer
     permission_classes = (permissions.IsAuthenticated, IsAdmin)
@@ -133,6 +68,30 @@ class UserViewSet(viewsets.ModelViewSet):
     http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
 
     def get_serializer_class(self):
-        if self.action in ('list', 'retrieve'):
-            return AdminUserSerializer
+        if self.action == 'me':
+            return UserSerializer
         return AdminUserSerializer
+
+    @action(
+        detail=False,
+        methods=['get', 'patch'],
+        permission_classes=[permissions.IsAuthenticated],
+        url_path='me',
+        url_name='me'
+    )
+    def get_or_update_me(self, request):
+        user = request.user
+
+        if request.method == 'GET':
+            serializer = self.get_serializer(user)
+            return Response(serializer.data)
+
+        elif request.method == 'PATCH':
+            serializer = self.get_serializer(
+                user,
+                data=request.data,
+                partial=True
+            )
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data)

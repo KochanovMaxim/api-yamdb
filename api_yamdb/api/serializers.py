@@ -1,7 +1,13 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
+from django.core.validators import RegexValidator
+from django.contrib.auth.tokens import default_token_generator
 
+from reviews.constants import (
+    USERNAME_MAX_LENGTH, EMAIL_MAX_LENGTH, USERNAME_REGEX, FORBIDDEN_USERNAME
+)
 from reviews.models import Category, Comment, Genre, Review, Title
+
 
 User = get_user_model()
 
@@ -18,14 +24,32 @@ class GenreSerializer(serializers.ModelSerializer):
         model = Genre
 
 
-class TitleSerializer(serializers.ModelSerializer):
-    category = CategorySerializer(read_only=True)
-    genre = GenreSerializer(many=True, read_only=True)
-    rating = serializers.IntegerField(read_only=True)
+class TitleWriteSerializer(serializers.ModelSerializer):
+    category = serializers.SlugRelatedField(
+        slug_field='slug',
+        queryset=Category.objects.all()
+    )
+    genre = serializers.SlugRelatedField(
+        slug_field='slug',
+        queryset=Genre.objects.all(),
+        many=True
+    )
 
     class Meta:
-        fields = '__all__'
         model = Title
+        fields = ('id', 'name', 'year', 'description', 'category', 'genre')
+
+
+class TitleReadSerializer(serializers.ModelSerializer):
+    category = CategorySerializer(read_only=True)
+    genre = GenreSerializer(many=True, read_only=True)
+    rating = serializers.IntegerField(read_only=True, default=None)
+
+    class Meta:
+        model = Title
+        fields = (
+            'id', 'name', 'year', 'description', 'category', 'genre', 'rating'
+        )
 
 
 class ReviewSerializer(serializers.ModelSerializer):
@@ -36,8 +60,7 @@ class ReviewSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Review
-        fields = ('id', 'text', 'author', 'score', 'pub_date', 'title')
-        read_only_fields = ('author', 'title', 'pub_date')
+        fields = ('id', 'text', 'author', 'score', 'pub_date')
 
     def validate(self, attrs):
         if self.context['request'].method != 'POST':
@@ -46,14 +69,10 @@ class ReviewSerializer(serializers.ModelSerializer):
         author = self.context['request'].user
         title_id = self.context['view'].kwargs.get('title_id')
 
-        try:
-            title = Title.objects.get(id=title_id)
-            if Review.objects.filter(author=author, title=title).exists():
-                raise serializers.ValidationError(
-                    'Нельзя написать два отзыва на произведение'
-                )
-        except Title.DoesNotExist:
-            pass
+        if Review.objects.filter(author=author, title_id=title_id).exists():
+            raise serializers.ValidationError(
+                'Нельзя написать два отзыва на произведение'
+            )
 
         return attrs
 
@@ -66,5 +85,119 @@ class CommentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Comment
-        fields = ('id', 'text', 'author', 'pub_date', 'review')
-        read_only_fields = ('author', 'review', 'pub_date')
+        fields = ('id', 'text', 'author', 'pub_date')
+
+
+class SignupSerializer(serializers.Serializer):
+    username = serializers.CharField(
+        max_length=USERNAME_MAX_LENGTH,
+        required=True,
+        validators=[
+            RegexValidator(
+                regex=USERNAME_REGEX,
+                message='Недопустимые символы в имени пользователя'
+            )
+        ]
+    )
+    email = serializers.EmailField(
+        required=True,
+        max_length=EMAIL_MAX_LENGTH
+    )
+
+    def validate_username(self, value):
+        if value == FORBIDDEN_USERNAME:
+            raise serializers.ValidationError('Недопустимое имя пользователя')
+        return value
+
+    def validate(self, data):
+        username = data.get('username')
+        email = data.get('email')
+
+        if User.objects.filter(username=username).exists():
+            user = User.objects.get(username=username)
+            if user.email != email:
+                raise serializers.ValidationError({
+                    'email': 'Этот email используется другим пользователем.'
+                })
+
+        elif User.objects.filter(email=email).exists():
+            raise serializers.ValidationError({
+                'email': 'Этот email уже используется другим пользователем.'
+            })
+
+        return data
+
+    def create(self, validated_data):
+        username = validated_data['username']
+        email = validated_data['email']
+
+        user, created = User.objects.get_or_create(
+            username=username,
+            defaults={
+                'email': email,
+                'is_active': True
+            }
+        )
+
+        if not created and user.email != email:
+            user.email = email
+            user.save()
+
+        return user
+
+    def to_representation(self, instance):
+        return {
+            'username': instance.username,
+            'email': instance.email
+        }
+
+
+class TokenSerializer(serializers.Serializer):
+    username = serializers.CharField()
+    confirmation_code = serializers.CharField()
+
+    def validate(self, data):
+        username = data.get('username')
+        confirmation_code = data.get('confirmation_code')
+
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            raise serializers.ValidationError(
+                {'username': 'Пользователь не найден'}
+            )
+
+        if not default_token_generator.check_token(user, confirmation_code):
+            raise serializers.ValidationError(
+                {'confirmation_code': 'Неверный код подтверждения'}
+            )
+
+        data['user'] = user
+        return data
+
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = (
+            'username',
+            'email',
+            'first_name',
+            'last_name',
+            'bio',
+            'role',
+        )
+        read_only_fields = ('role',)
+
+
+class AdminUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = (
+            'username',
+            'email',
+            'first_name',
+            'last_name',
+            'bio',
+            'role',
+        )
