@@ -5,6 +5,7 @@ import sys
 import django
 from django.contrib.auth import get_user_model
 
+# перенести строку после метода setup(). Тесты не пропускают.
 from reviews.models import Category, Comment, Genre, Review, Title
 
 
