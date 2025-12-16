@@ -5,13 +5,15 @@ import sys
 import django
 from django.contrib.auth import get_user_model
 
+from reviews.models import Category, Comment, Genre, Review, Title
+
+
 project_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_path)
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'api_yamdb.settings')
 django.setup()
 
-from reviews.models import Category, Comment, Genre, Review, Title
 
 DATA_DIR = os.path.join('static', 'data')
 FILES = {
@@ -360,26 +362,16 @@ def load_comments():
 
 def main():
     """Основная функция загрузки данных."""
-    print("Начинаю загрузку данных...")
     load_results = {}
 
     for file_name, func_name in LOAD_FUNCTIONS:
-        print(f"Загружаю {file_name}...")
         func = globals()[func_name]
         count = func()
         load_results[file_name] = count
-        print(f"  Загружено: {count} записей")
 
-    print("\n" + "="*50)
-    print("Итоговые результаты загрузки данных:")
-    print("="*50)
     total = 0
     for file_name, count in load_results.items():
-        print(f"  {file_name:15}: {count:6} записей")
         total += count
-    print("="*50)
-    print(f"  Всего загружено: {total} записей")
-    print("="*50)
 
 
 if __name__ == "__main__":
