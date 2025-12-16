@@ -4,15 +4,11 @@ from django.utils.text import Truncator
 
 from reviews.constants import (
     CHARFIELD_NAME_MAX_LENGTH,
-    CHARFIELD_SLUG_MAX_LENGTH,
     SCORE_MIN_VALUE,
     SCORE_MAX_VALUE,
     STR_TEXT_TRUNCATE_CHARS
 )
 from reviews.validators import validate_film_year, validate_score
-
-
-User = get_user_model()
 
 
 User = get_user_model()
@@ -25,7 +21,6 @@ class NameSlugBaseModel(models.Model):
         help_text='Введите название'
     )
     slug = models.SlugField(
-        max_length=CHARFIELD_SLUG_MAX_LENGTH,
         unique=True,
         verbose_name='Slug',
         help_text='Короткий идентификатор для URL'
@@ -81,7 +76,7 @@ class Title(models.Model):
         verbose_name='Название произведения',
         help_text='Полное название фильма, сериала или книги'
     )
-    year = models.PositiveSmallIntegerField(
+    year = models.SmallIntegerField(
         validators=[validate_film_year],
         verbose_name='Год выпуска',
         help_text='Год первого выпуска произведения'
@@ -134,6 +129,7 @@ class Review(TextAuthorPubDateModel):
     class Meta(TextAuthorPubDateModel.Meta):
         verbose_name = 'Отзыв'
         verbose_name_plural = 'Отзывы'
+        default_related_name = 'reviews'
         constraints = [
             models.UniqueConstraint(
                 fields=['author', 'title'],
@@ -154,3 +150,4 @@ class Comment(TextAuthorPubDateModel):
     class Meta(TextAuthorPubDateModel.Meta):
         verbose_name = 'Комментарий'
         verbose_name_plural = 'Комментарии'
+        default_related_name = 'comments'

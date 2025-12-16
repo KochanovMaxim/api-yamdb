@@ -5,18 +5,11 @@ from django.utils.translation import gettext_lazy as _
 from reviews.constants import (
     SCORE_MIN_VALUE,
     SCORE_MAX_VALUE,
-    FIRST_FILM,
 )
 
 
 def validate_film_year(value):
     current_year = timezone.now().year
-
-    if value < FIRST_FILM:
-        raise ValidationError(_(
-            f'Первый фильм был снят в {FIRST_FILM} году. '
-            f'Вы указали: {value}'
-        ))
 
     if value > current_year:
         raise ValidationError(_(

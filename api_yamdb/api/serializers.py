@@ -1,13 +1,14 @@
-from django.contrib.auth import get_user_model
 from rest_framework import serializers
-from django.core.validators import RegexValidator
+
+from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
+from django.core.validators import RegexValidator
+from django.http import Http404
 
 from reviews.constants import (
     USERNAME_MAX_LENGTH, EMAIL_MAX_LENGTH, USERNAME_REGEX, FORBIDDEN_USERNAME
 )
 from reviews.models import Category, Comment, Genre, Review, Title
-
 
 User = get_user_model()
 
@@ -32,12 +33,16 @@ class TitleWriteSerializer(serializers.ModelSerializer):
     genre = serializers.SlugRelatedField(
         slug_field='slug',
         queryset=Genre.objects.all(),
-        many=True
+        many=True,
+        allow_empty=False
     )
 
     class Meta:
         model = Title
         fields = ('id', 'name', 'year', 'description', 'category', 'genre')
+
+    def to_representation(self, instance):
+        return TitleReadSerializer(instance, context=self.context).data
 
 
 class TitleReadSerializer(serializers.ModelSerializer):
@@ -128,28 +133,14 @@ class SignupSerializer(serializers.Serializer):
         return data
 
     def create(self, validated_data):
-        username = validated_data['username']
-        email = validated_data['email']
-
-        user, created = User.objects.get_or_create(
-            username=username,
+        user, _ = User.objects.get_or_create(
+            username=validated_data['username'],
             defaults={
-                'email': email,
+                'email': validated_data['email'],
                 'is_active': True
             }
         )
-
-        if not created and user.email != email:
-            user.email = email
-            user.save()
-
         return user
-
-    def to_representation(self, instance):
-        return {
-            'username': instance.username,
-            'email': instance.email
-        }
 
 
 class TokenSerializer(serializers.Serializer):
@@ -163,7 +154,7 @@ class TokenSerializer(serializers.Serializer):
         try:
             user = User.objects.get(username=username)
         except User.DoesNotExist:
-            return data
+            raise Http404('Пользователь с таким именем не существует.')
 
         if not default_token_generator.check_token(user, confirmation_code):
             raise serializers.ValidationError(
@@ -175,29 +166,6 @@ class TokenSerializer(serializers.Serializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = (
-            'username', 'email', 'first_name', 'last_name', 'bio', 'role'
-        )
-        read_only_fields = ('role',)
-
-    def validate_username(self, value):
-        if value == FORBIDDEN_USERNAME:
-            raise serializers.ValidationError('Недопустимое имя пользователя')
-        return value
-
-    def validate(self, data):
-        if self.instance is not None:
-            if 'role' in data and data['role'] != self.instance.role:
-                raise serializers.ValidationError({
-                    'role': 'Вы не можете изменить свою роль.'
-                })
-
-        return data
-
-
-class AdminUserSerializer(serializers.ModelSerializer):
     username = serializers.CharField(
         max_length=USERNAME_MAX_LENGTH,
         required=True,
@@ -207,6 +175,10 @@ class AdminUserSerializer(serializers.ModelSerializer):
                 message='Недопустимые символы в имени пользователя'
             )
         ]
+    )
+    email = serializers.EmailField(
+        required=True,
+        max_length=EMAIL_MAX_LENGTH
     )
 
     class Meta:
@@ -233,7 +205,6 @@ class AdminUserSerializer(serializers.ModelSerializer):
         return value
 
     def validate_email(self, value):
-
         if self.instance is None:
             if User.objects.filter(email=value).exists():
                 raise serializers.ValidationError(
@@ -241,3 +212,12 @@ class AdminUserSerializer(serializers.ModelSerializer):
                 )
 
         return value
+
+    def get_fields(self):
+        fields = super().get_fields()
+
+        request = self.context.get('request')
+        if not request or not getattr(request.user, 'is_admin', False):
+            fields['role'].read_only = True
+
+        return fields

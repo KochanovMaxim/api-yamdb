@@ -2,7 +2,6 @@
 
 # Для названий
 CHARFIELD_NAME_MAX_LENGTH = 256
-CHARFIELD_SLUG_MAX_LENGTH = 50
 
 # Для оценок
 SCORE_MIN_VALUE = 1
@@ -10,9 +9,6 @@ SCORE_MAX_VALUE = 10
 
 # Для обрезки текста
 STR_TEXT_TRUNCATE_CHARS = 50
-
-# Для валидации годов
-FIRST_FILM = 1888  # год первого фильма
 
 # Для пользователей (добавляем)
 USERNAME_MAX_LENGTH = 150

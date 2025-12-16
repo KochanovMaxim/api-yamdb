@@ -1,16 +1,16 @@
-from django.conf import settings
-from django.contrib.auth import get_user_model
-from django.contrib.auth.tokens import default_token_generator
-from django.core.mail import send_mail
 from rest_framework import filters, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import AccessToken
 
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.contrib.auth.tokens import default_token_generator
+from django.core.mail import send_mail
+
 from api.permissions import IsAdmin
 from api.serializers import (
-    AdminUserSerializer,
     UserSerializer,
     SignupSerializer,
     TokenSerializer,
@@ -49,48 +49,28 @@ class TokenView(APIView):
 
     def post(self, request):
         serializer = TokenSerializer(data=request.data)
-
-        if not serializer.is_valid():
-            return Response(
-                serializer.errors, status=status.HTTP_400_BAD_REQUEST
-            )
+        serializer.is_valid(raise_exception=True)
 
         validated_data = serializer.validated_data
-
-        if 'user' not in validated_data:
-            # Пользователь не найден - возвращаем 404
-            return Response(
-                {'username': 'Пользователь не найден'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
         user = validated_data['user']
 
-        confirmation_code = validated_data.get('confirmation_code')
-        if not default_token_generator.check_token(user, confirmation_code):
-            return Response(
-                {'confirmation_code': 'Неверный код подтверждения'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
         token = AccessToken.for_user(user)
-
         return Response({'token': str(token)})
 
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
-    serializer_class = AdminUserSerializer
+    serializer_class = UserSerializer
     permission_classes = (permissions.IsAuthenticated, IsAdmin)
     lookup_field = 'username'
     filter_backends = (filters.SearchFilter,)
     search_fields = ('username',)
     http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
 
-    def get_serializer_class(self):
-        if self.action == 'me':
-            return UserSerializer
-        return AdminUserSerializer
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
 
     @action(
         detail=False,
@@ -107,16 +87,14 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
 
         elif request.method == 'PATCH':
-            if 'role' in request.data:
-                return Response(
-                    {'role': 'Вы не можете изменить свою роль.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            request_data = request.data.copy()
+            request_data['role'] = user.role
 
             serializer = self.get_serializer(
                 user,
-                data=request.data,
-                partial=True
+                data=request_data,
+                partial=True,
+                context=self.get_serializer_context()
             )
             serializer.is_valid(raise_exception=True)
             serializer.save()

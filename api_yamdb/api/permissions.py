@@ -11,12 +11,6 @@ class IsAdmin(BasePermission):
         return bool(user and getattr(user, 'is_admin', False))
 
 
-class IsModerator(BasePermission):
-    def has_permission(self, request, view):
-        user = getattr(request, 'user', None)
-        return bool(user and getattr(user, 'is_moderator', False))
-
-
 class IsAdminOrReadOnly(BasePermission):
     def has_permission(self, request, view):
         return bool(
@@ -27,13 +21,6 @@ class IsAdminOrReadOnly(BasePermission):
 
 
 class IsAuthorModeratorAdminOrReadOnly(BasePermission):
-    def has_permission(self, request, view):
-        return bool(
-            request.method in SAFE_METHODS
-            or getattr(request, 'user', None)
-            and getattr(request.user, 'is_authenticated', False)
-        )
-
     def has_object_permission(self, request, view, obj):
         user = request.user
 

@@ -1,5 +1,6 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.core.validators import RegexValidator
 
 from reviews.constants import (
     USERNAME_MAX_LENGTH,
@@ -8,19 +9,24 @@ from reviews.constants import (
     ROLE_CHOICES,
     USER,
     MODERATOR,
-    ADMIN
+    ADMIN,
+    USERNAME_REGEX
 )
 from users.validators import validate_username_not_me
 
 
 class User(AbstractUser):
-    ROLE_CHOICES = ROLE_CHOICES
-
     username = models.CharField(
         max_length=USERNAME_MAX_LENGTH,
         unique=True,
         help_text=f'Обязательное поле. {USERNAME_MAX_LENGTH} символов.',
-        validators=[validate_username_not_me],
+        validators=[
+            validate_username_not_me,
+            RegexValidator(
+                regex=USERNAME_REGEX,
+                message='Недопустимые символы в имени пользователя'
+            )
+        ],
         error_messages={
             'unique': 'Пользователь с таким именем уже существует.',
         },
